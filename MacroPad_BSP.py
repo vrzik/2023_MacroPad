@@ -8,7 +8,7 @@ import displayio
 from adafruit_display_text import label
 from adafruit_bitmap_font import bitmap_font
 from adafruit_st7789 import ST7789
-from digitalio import DigitalInOut, Direction, Pull
+from digitalio import DigitalInOut, Direction, Pull, DriveMode
 
 
 class BSP():
@@ -56,11 +56,11 @@ class BSP():
     __KeyBuffer = 0
     
     def __init__(self):
-        self.LEDs = neopixel.NeoPixel(self._NeoLED, 20, brightness=0.5, auto_write = False)
-        self.LEDs.fill( (0, 0, 0) )
-        self.LEDs.show()
-        
         self.__DBLK = pwmio.PWMOut(self._D_BLK, frequency = 1000, duty_cycle = 0)
+        
+        self.LEDs = neopixel.NeoPixel(self._NeoLED, 20, brightness=0.1, auto_write = False)
+        self.LEDs.fill( (80, 0, 40) )
+        self.LEDs.show()
         
         displayio.release_displays()
     
@@ -69,6 +69,15 @@ class BSP():
                                         reset = self._D_RST)
         self.Display = ST7789(DisplayBus, width = 280, height = 240, rowstart = 20, rotation = 90)
         
+        # Make the display context
+        splash = displayio.Group()
+        
+        splashBitmap = displayio.OnDiskBitmap("/Splash.bmp")
+        tileGrid = displayio.TileGrid(splashBitmap, pixel_shader = splashBitmap.pixel_shader)
+        splash.append(tileGrid)
+        self.Display.show(splash)
+        self.DispBrightness = 50
+               
         self._K_R0.direction = Direction.INPUT
         self._K_R0.pull = Pull.DOWN
         self._K_R1.direction = Direction.INPUT
@@ -77,12 +86,13 @@ class BSP():
         self._K_R2.pull = Pull.DOWN
         self._K_R3.direction = Direction.INPUT
         self._K_R3.pull = Pull.DOWN
-        self._K_C0.direction = Direction.OUTPUT
-        self._K_C1.direction = Direction.OUTPUT
-        self._K_C2.direction = Direction.OUTPUT
+        self._K_C0.switch_to_output(False, DriveMode.PUSH_PULL)
+        self._K_C1.switch_to_output(False, DriveMode.PUSH_PULL)
+        self._K_C2.switch_to_output(False, DriveMode.PUSH_PULL)
         
     def Periodic(self):
-        bf = 0
+        bf = int(0)
+        mask = int(0)
         if self._K_R0.value:
             bf |= 1
         if self._K_R1.value:
@@ -91,12 +101,13 @@ class BSP():
             bf |= 64
         if self._K_R3.value:
             bf |= 512
-        mask = 585
+        
+        mask = 0xFDB6
         mask = mask << self.__ACol
         bf = bf << self.__ACol
             
-        self.__KeyBuffer = self.__KeyBuffer & ~mask
-        self.__KeyBuffer = self.__KeyBuffer | bf
+        self.__KeyBuffer &= mask
+        self.__KeyBuffer |= bf
         
         if self.__ACol == 0:
             self._K_C2.value = False
@@ -134,10 +145,12 @@ class BSP():
 if __name__ == '__main__':
     print("BSP executed")
     MacroPad = BSP()
+    print("BSP initialized")
+    
     
     for i in range(20):
         MacroPad.LEDs.fill( (0,0,0) )
-        MacroPad.LEDs[i] = (255, (i * 30), 0)
+        MacroPad.LEDs[i] = (0, (i * 30), 0)
         MacroPad.LEDs.show()
         MacroPad.DispBrightness = i * 5
         time.sleep(0.05)
@@ -152,11 +165,12 @@ if __name__ == '__main__':
         MacroPad.LEDs[i] = ( 20 + (i / 12), 250 - (i * 12), 30)
     MacroPad.LEDs.show()
     
-    time.sleep(5)
+    time.sleep(1)
     
     MacroPad.LEDs.fill( (0,0,0) )
     MacroPad.LEDs.show()
-    MacroPad.DispBrightness = 0
+    
+    MacroPad.LEDs.brightness = 1
     
     while True:
         MacroPad.Periodic()
@@ -165,7 +179,7 @@ if __name__ == '__main__':
             for i in range(12):
                 msk = 1 << i
                 if (MacroPad.KeysStatus & msk) == msk:
-                    MacroPad.LEDs[i] = ( 255, 0, 0)
+                    MacroPad.LEDs[i] = ( 255, 0, 255)
         MacroPad.LEDs.show()
             
     
